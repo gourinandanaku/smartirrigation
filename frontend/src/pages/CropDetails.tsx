@@ -1,13 +1,63 @@
 import { useState } from 'react'
 
 // FR5: Crop-specific details — optimal soil moisture, temperature, fertilizer, growth duration
-const crops: Record<string, { moisture: string; temp: string; fertilizer: string; duration: string }> = {
-  Rice: { moisture: '60–80%', temp: '20–37°C', fertilizer: 'N-P-K 40-20-20, split at tillering & panicle', duration: '90–150 days' },
-  Wheat: { moisture: '40–60%', temp: '15–25°C', fertilizer: 'N-P-K 60-40-20, top-dress at tillering', duration: '110–130 days' },
-  Tomato: { moisture: '50–70%', temp: '18–28°C', fertilizer: 'Balanced 19-19-19, add Ca to prevent blossom end rot', duration: '70–90 days' },
-  Cotton: { moisture: '45–65%', temp: '21–30°C', fertilizer: 'N-P-K 80-40-40, avoid excess N late', duration: '150–180 days' },
-  Sugarcane: { moisture: '55–75%', temp: '25–32°C', fertilizer: 'Heavy N (200+ kg/ha), P at planting', duration: '10–18 months' },
-  Maize: { moisture: '50–70%', temp: '21–30°C', fertilizer: 'N-P-K 120-60-40, side-dress at knee-high', duration: '80–110 days' },
+const crops: Record<
+  string,
+  { moisture: string; temp: string; fertilizer: string; duration: string; start: number; stop: number }
+> = {
+  Rice: {
+    moisture: "60–80%",
+    temp: "20–37°C",
+    fertilizer: "N-P-K 40-20-20",
+    duration: "90–150 days",
+    start: 60,
+    stop: 80
+  },
+
+  Wheat: {
+    moisture: "40–60%",
+    temp: "15–25°C",
+    fertilizer: "N-P-K 60-40-20",
+    duration: "110–130 days",
+    start: 40,
+    stop: 60
+  },
+
+  Tomato: {
+    moisture: "50–70%",
+    temp: "18–28°C",
+    fertilizer: "19-19-19",
+    duration: "70–90 days",
+    start: 50,
+    stop: 70
+  },
+
+  Cotton: {
+    moisture: "45–65%",
+    temp: "21–30°C",
+    fertilizer: "N-P-K 80-40-40",
+    duration: "150–180 days",
+    start: 45,
+    stop: 65
+  },
+
+  Sugarcane: {
+    moisture: "55–75%",
+    temp: "25–32°C",
+    fertilizer: "Heavy N",
+    duration: "10–18 months",
+    start: 55,
+    stop: 75
+  },
+
+  Maize: {
+    moisture: "50–70%",
+    temp: "21–30°C",
+    fertilizer: "N-P-K 120-60-40",
+    duration: "80–110 days",
+    start: 50,
+    stop: 70
+  }
 }
 
 export default function CropDetails() {

@@ -1,158 +1,257 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const axios = require("axios");
+const express = require("express")
+const mongoose = require("mongoose")
+const cors = require("cors")
+const axios = require("axios")
 
-const app = express();
+const app = express()
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors())
+app.use(express.json())
 
-/* ==============================
-   🔗 MongoDB Connection
-============================== */
+// ==============================
+// MongoDB Connection
+// ==============================
 
-mongoose.connect("mongodb+srv://user:user@cluster0.dypnqbb.mongodb.net/smartag?retryWrites=true&w=majority")
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.log(err));
+mongoose.connect(
+  "mongodb+srv://user:user@cluster0.dypnqbb.mongodb.net/smartag?retryWrites=true&w=majority"
+)
+.then(() => {
+  console.log("MongoDB Connected")
+  app.listen(5000, "0.0.0.0", () => {
+    console.log("Server running on port 5000")
+  })
+})
+.catch(err => console.log(err))
 
-
-/* ==============================
-   🌱 Sensor Data Schema
-============================== */
-
-const sensorSchema = new mongoose.Schema({
-  temperature: Number,
-  humidity: Number,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const Sensor = mongoose.model("Sensor", sensorSchema);
-
-
-/* ==============================
-   🌾 Plot Schema
-============================== */
+// ==============================
+// Plot Schema
+// ==============================
 
 const plotSchema = new mongoose.Schema({
   name: String,
   crop: String,
   location: String,
+  latitude: Number,
+  longitude: Number,
   deviceId: String,
-  area: String,
+  startThreshold: Number,
+  stopThreshold: Number
+})
+
+const Plot = mongoose.model("Plot", plotSchema)
+
+// ==============================
+// Sensor Schema
+// ==============================
+
+const sensorSchema = new mongoose.Schema({
+  deviceId: String,
+  temperature: Number,
+  humidity: Number,
+  soilMoisture: Number,
   createdAt: {
     type: Date,
     default: Date.now
   }
-});
+})
 
-const Plot = mongoose.model("Plot", plotSchema);
+const Sensor = mongoose.model("Sensor", sensorSchema)
 
-/* ==============================
-   🌤 Weather API Route
-============================== */
+// ==============================
+// Pump Status Schema (persistent)
+// ==============================
 
-app.get("/api/weather", async (req, res) => {
-  try {
-    const city = "Kochi";
-    const apiKey = "ee1e7d895befb3227749a7f965d43aa0";
+const pumpSchema = new mongoose.Schema({
+  deviceId: { type: String, unique: true },
+  status: { type: String, default: "OFF" },
+  updatedAt: { type: Date, default: Date.now }
+})
 
-    const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`
-    );
+const Pump = mongoose.model("Pump", pumpSchema)
 
-    res.json(response.data);
-  } catch (error) {
-    console.log(error.message);
-    res.status(500).json({ message: "Weather fetch failed" });
-  }
-});
+// ==============================
+// Crop Thresholds
+// ==============================
 
+const cropThresholds = {
+  Rice:      { start: 60, stop: 80 },
+  Wheat:     { start: 40, stop: 60 },
+  Tomato:    { start: 50, stop: 70 },
+  Cotton:    { start: 45, stop: 65 },
+  Sugarcane: { start: 55, stop: 75 },
+  Maize:     { start: 50, stop: 70 },
+  Corn:      { start: 50, stop: 70 },
+  Soybean:   { start: 45, stop: 65 },
+  Potato:    { start: 55, stop: 75 }
+}
 
-/* ==============================
-   🔁 Simulate Sensor Data
-============================== */
-
-app.get("/api/simulate-sensor", async (req, res) => {
-  const temp = (25 + Math.random() * 5).toFixed(1);
-  const humidity = (60 + Math.random() * 20).toFixed(1);
-
-  const newData = new Sensor({
-    temperature: temp,
-    humidity: humidity
-  });
-
-  await newData.save();
-
-  res.json(newData);
-});
-
-
-/* ==============================
-   📊 Get Latest Sensor Data
-============================== */
-
-app.get("/api/sensor/latest", async (req, res) => {
-  const data = await Sensor.findOne().sort({ createdAt: -1 });
-  res.json(data);
-});
-
-/* ==============================
-   ➕ Add New Plot
-============================== */
+// ==============================
+// Add Plot
+// ==============================
 
 app.post("/api/plots", async (req, res) => {
   try {
-    const { name, crop, location, deviceId, area } = req.body;
+    const { crop } = req.body
+    const threshold = cropThresholds[crop] || { start: 40, stop: 70 }
 
-    const newPlot = new Plot({
-      name,
-      crop,
-      location,
-      deviceId,
-      area
-    });
+    const plot = new Plot({
+      ...req.body,
+      startThreshold: threshold.start,
+      stopThreshold: threshold.stop
+    })
 
-    await newPlot.save();
-
-    res.json(newPlot);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error creating plot" });
+    await plot.save()
+    res.json(plot)
+  } catch (err) {
+    res.status(500).json({ message: "Error creating plot" })
   }
-});
-/* ==============================
-   📋 Get All Plots
-============================== */
+})
+
+// ==============================
+// Get All Plots
+// ==============================
 
 app.get("/api/plots", async (req, res) => {
   try {
-    const plots = await Plot.find().sort({ createdAt: -1 });
-    res.json(plots);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch plots" });
+    const plots = await Plot.find()
+    res.json(plots)
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching plots" })
   }
-});
-/* ==============================
-   ❌ Delete Plot
-============================== */
+})
+
+// ==============================
+// Delete Plot
+// ==============================
 
 app.delete("/api/plots/:id", async (req, res) => {
   try {
-    await Plot.findByIdAndDelete(req.params.id);
-    res.json({ message: "Plot deleted" });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to delete plot" });
+    await Plot.findByIdAndDelete(req.params.id)
+    res.json({ message: "Plot deleted" })
+  } catch (err) {
+    res.status(500).json({ message: "Error deleting plot" })
   }
-});
-/* ==============================
-   🚀 Start Server
-============================== */
+})
 
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
-});
+// ==============================
+// Get Plot Thresholds (for ESP + dashboard)
+// ==============================
+
+app.get("/api/threshold/:deviceId", async (req, res) => {
+  try {
+    const plot = await Plot.findOne({ deviceId: req.params.deviceId })
+    if (!plot) return res.json({ start: 40, stop: 70 })
+    res.json({ start: plot.startThreshold, stop: plot.stopThreshold })
+  } catch (err) {
+    res.status(500).json({ message: "Threshold error" })
+  }
+})
+
+// ==============================
+// UPDATE Plot Thresholds (from dashboard)
+// ==============================
+
+app.put("/api/threshold/:deviceId", async (req, res) => {
+  try {
+    const { start, stop } = req.body
+    const plot = await Plot.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      { startThreshold: start, stopThreshold: stop },
+      { new: true }
+    )
+    if (!plot) return res.status(404).json({ message: "Plot not found" })
+    res.json({ start: plot.startThreshold, stop: plot.stopThreshold })
+  } catch (err) {
+    res.status(500).json({ message: "Error updating threshold" })
+  }
+})
+
+// ==============================
+// Receive Sensor Data From ESP
+// ==============================
+
+app.post("/api/sensor", async (req, res) => {
+  try {
+    const { deviceId, temperature, humidity, soilMoisture } = req.body
+    const data = new Sensor({ deviceId, temperature, humidity, soilMoisture })
+    await data.save()
+    res.json({ message: "Sensor data saved" })
+  } catch (err) {
+    res.status(500).json({ message: "Error saving sensor data" })
+  }
+})
+
+// ==============================
+// Get Latest Sensor Data
+// ==============================
+
+app.get("/api/sensor/:deviceId", async (req, res) => {
+  try {
+    const data = await Sensor.find({ deviceId: req.params.deviceId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching sensor data" })
+  }
+})
+
+// ==============================
+// Get Sensor History (last 50 readings)
+// ==============================
+
+app.get("/api/sensor/history/:deviceId", async (req, res) => {
+  try {
+    const data = await Sensor.find({ deviceId: req.params.deviceId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching history" })
+  }
+})
+
+// ==============================
+// Pump Control — Dashboard sends command
+// ==============================
+
+app.post("/api/pump", async (req, res) => {
+  const { deviceId, status } = req.body
+  try {
+    await Pump.findOneAndUpdate(
+      { deviceId },
+      { status, updatedAt: new Date() },
+      { upsert: true, new: true }
+    )
+    res.json({ message: "Pump command updated", status })
+  } catch (err) {
+    res.status(500).json({ message: "Error updating pump status" })
+  }
+})
+
+// ESP polls pump status
+app.get("/api/pump/:deviceId", async (req, res) => {
+  try {
+    const pump = await Pump.findOne({ deviceId: req.params.deviceId })
+    res.json({ status: pump ? pump.status : "OFF" })
+  } catch (err) {
+    res.json({ status: "OFF" })
+  }
+})
+
+// ==============================
+// Weather API
+// ==============================
+
+const WEATHER_KEY = "ee1e7d895befb3227749a7f965d43aa0"
+
+app.get("/api/weather", async (req, res) => {
+  const { lat, lon } = req.query
+  const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${WEATHER_KEY}&units=metric`
+  try {
+    const response = await axios.get(url)
+    res.json(response.data)
+  } catch (err) {
+    res.status(500).json({ message: "Weather API error" })
+  }
+})
