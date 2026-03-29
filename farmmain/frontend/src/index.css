@@ -1,0 +1,67 @@
+:root {
+  --bg: #0d1b0d;
+  --surface: #162816;
+  --surface-hover: #1e3520;
+  --primary: #3d7c47;
+  --primary-dim: #2d5c35;
+  --accent: #6bc77a;
+  --text: #e8f0e9;
+  --text-muted: #9bb09d;
+  --danger: #c75c5c;
+  --warning: #d4a84b;
+  --radius: 10px;
+  --shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.badge--success { background: var(--primary-dim); color: var(--accent); }
+.badge--warning { background: rgba(212,168,75,0.2); color: var(--warning); }
+.badge--danger { background: rgba(199,92,92,0.2); color: var(--danger); }
