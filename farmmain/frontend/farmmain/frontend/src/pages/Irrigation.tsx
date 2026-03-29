@@ -1,20 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-// FR2: Auto control irrigation based on soil moisture thresholds and weather
-
 export default function Irrigation() {
   const [searchParams] = useSearchParams()
   const plotId   = searchParams.get('plot')     || ''
   const location = searchParams.get('location') || 'Unknown location'
   const plotName = searchParams.get('name')     || 'Plot'
-  const deviceId = searchParams.get('device')   || ''   // ← was missing entirely
+  const deviceId = searchParams.get('device')   || ''
 
   // ── Pump state ────────────────────────────────────────────────────────────
-  const [pumpStatus, setPumpStatus]   = useState<'ON' | 'OFF'>('OFF')
-  const [autoOn, setAutoOn]           = useState(true)
+  // FIX: pumpStatus ഇനി ESP32 actual relay state ആണ്
+  // sensor poll-ൽ നിന്ന് pumpRunning field read ചെയ്യുന്നു
+  const [pumpStatus, setPumpStatus] = useState<'ON' | 'OFF'>('OFF')
 
-  // ── Thresholds (loaded from DB, saved back to DB → ESP picks up in 30s) ──
+  // ── Thresholds ────────────────────────────────────────────────────────────
   const [thresholdLow, setThresholdLow]   = useState(40)
   const [thresholdHigh, setThresholdHigh] = useState(70)
   const [savingThreshold, setSavingThreshold] = useState(false)
@@ -28,8 +27,7 @@ export default function Irrigation() {
   const [rainWarning, setRainWarning] = useState(false)
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 1. Load thresholds from MongoDB on mount
-  //    ESP32 also fetches this endpoint every 30s via getThreshold()
+  // 1. Load thresholds on mount
   // ══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!deviceId) return
@@ -40,48 +38,40 @@ export default function Irrigation() {
         setThresholdLow(data.start)
         setThresholdHigh(data.stop)
       })
-      .catch(() => {})   // keep defaults on error
-  }, [deviceId])
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 2. Load current pump status from MongoDB on mount
-  //    ESP32 polls this endpoint every 4s via checkPumpCommand()
-  // ══════════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (!deviceId) return
-
-    fetch(`http://localhost:5000/api/pump/${deviceId}`)
-      .then(res => res.json())
-      .then(data => setPumpStatus(data.status === 'ON' ? 'ON' : 'OFF'))
       .catch(() => {})
   }, [deviceId])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 3. Poll live sensor data every 5s
-  //    ESP32 sends POST /api/sensor every 5s via sendSensorData()
+  // 2. Poll live sensor data every 5s
+  //    FIX: pumpRunning field-ൽ നിന്ന് ESP32 actual relay state read ചെയ്യുന്നു
+  //    Dashboard button state അല്ല — ESP32 actually relay ON/OFF ചെയ്‌തതാണ്
   // ══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!deviceId) return
 
-    const fetchMoisture = async () => {
+    const fetchSensor = async () => {
       try {
         const res  = await fetch(`http://localhost:5000/api/sensor/${deviceId}`)
         const data = await res.json()
         const latest = Array.isArray(data) ? data[0] : data
-        if (latest) setCurrentMoisture(Number(latest.soilMoisture ?? 0))
+        if (latest) {
+          setCurrentMoisture(Number(latest.soilMoisture ?? 0))
+          // ESP32 actual relay state — 5s delay ഉണ്ടാകും
+          setPumpStatus(latest.pumpRunning ? 'ON' : 'OFF')
+        }
         setSensorError(null)
       } catch {
         setSensorError('Could not reach sensor')
       }
     }
 
-    fetchMoisture()
-    const t = setInterval(fetchMoisture, 5000)
+    fetchSensor()
+    const t = setInterval(fetchSensor, 5000)
     return () => clearInterval(t)
   }, [deviceId])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 4. Weather rain check — uses lat/lon from location URL param
+  // 3. Weather rain check
   // ══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!location || location === 'Unknown location') return
@@ -100,30 +90,9 @@ export default function Irrigation() {
   }, [location])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 5. Auto mode — when moisture drops below low threshold, fire pump ON
-  //    Mirrors the ESP32 logic in sendSensorData():
-  //      if(moisturePercent < startWateringAt) isPumpRunning = true;
-  //      if(moisturePercent >= stopWateringAt)  isPumpRunning = false;
-  // ══════════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (!autoOn || currentMoisture === null || !deviceId) return
-
-    const target: 'ON' | 'OFF' =
-      currentMoisture < thresholdLow  ? 'ON'  :
-      currentMoisture >= thresholdHigh ? 'OFF' :
-      pumpStatus   // hold current state in between thresholds
-
-    if (target !== pumpStatus) sendPumpCommand(target)
-  }, [currentMoisture, autoOn])
-
-  // ══════════════════════════════════════════════════════════════════════════
   // Helpers
   // ══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * POST /api/pump → saved to MongoDB
-   * ESP32 polls GET /api/pump/:deviceId every 4s and toggles RELAY_PIN
-   */
   const sendPumpCommand = async (status: 'ON' | 'OFF') => {
     if (!deviceId) return
     try {
@@ -132,26 +101,29 @@ export default function Irrigation() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ deviceId, status })
       })
+      // ഉടനെ optimistic update — 5s-ൽ sensor poll actual state overwrite ചെയ്യും
       setPumpStatus(status)
     } catch {
       alert('Failed to send pump command')
     }
   }
 
-  /**
-   * PUT /api/threshold/:deviceId → saved to MongoDB
-   * ESP32 fetches GET /api/threshold/:deviceId every 30s via getThreshold()
-   * and updates its local startWateringAt / stopWateringAt variables
-   */
   const saveThresholds = async () => {
     if (!deviceId) return
     try {
       setSavingThreshold(true)
-      await fetch(`http://localhost:5000/api/threshold/${deviceId}`, {
+      const res = await fetch(`http://localhost:5000/api/threshold/${deviceId}`, {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ start: thresholdLow, stop: thresholdHigh })
       })
+      if (!res.ok) {
+        alert('Failed to save thresholds — server error')
+        return
+      }
+      const data = await res.json()
+      setThresholdLow(data.start)
+      setThresholdHigh(data.stop)
       setThresholdSaved(true)
       setTimeout(() => setThresholdSaved(false), 2000)
     } catch {
@@ -161,9 +133,7 @@ export default function Irrigation() {
     }
   }
 
-  // ── Derived ───────────────────────────────────────────────────────────────
-  const moisture        = currentMoisture ?? 0
-  const shouldIrrigate  = autoOn && moisture < thresholdLow && !rainWarning
+  const moisture = currentMoisture ?? 0
 
   if (!deviceId) {
     return (
@@ -180,24 +150,52 @@ export default function Irrigation() {
         Plot #{plotId} ({location}) · Device: <code>{deviceId}</code>
       </p>
 
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--primary-dim)',
+        borderRadius: 8,
+        padding: '0.75rem 1rem',
+        marginBottom: '1.5rem',
+        fontSize: '0.9rem',
+        color: 'var(--text-muted)',
+        maxWidth: 800,
+      }}>
+        ℹ️ Pump status is the actual relay state reported by <code>{deviceId}</code> every 5s.
+        Manual commands take effect within 4s.
+      </div>
+
       {sensorError && (
         <p style={{ color: 'orange', fontSize: '0.9rem' }}>⚠️ {sensorError}</p>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', maxWidth: 800, marginTop: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', maxWidth: 800 }}>
 
-        {/* ── Status card ── */}
+        {/* ── Pump status card ── */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Pump status</h3>
 
+          {/* FIX: ESP32 actual relay state കാണിക്കുന്നു */}
           <p>
             Current:{' '}
             <strong style={{ color: pumpStatus === 'ON' ? 'green' : 'orange' }}>
               {pumpStatus}
             </strong>
+            <span style={{
+              marginLeft: 8,
+              fontSize: '0.75rem',
+              padding: '0.15rem 0.4rem',
+              borderRadius: 4,
+              background: pumpStatus === 'ON' ? '#d4edda' : '#fff3cd',
+              color:      pumpStatus === 'ON' ? '#155724' : '#856404',
+            }}>
+              {pumpStatus === 'ON' ? '💧 irrigating' : '⏸ idle'}
+            </span>
           </p>
 
-          {/* Manual buttons → POST /api/pump → ESP relay toggles within 4s */}
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: -8 }}>
+            ESP32 relay state · updates every 5s
+          </p>
+
           <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
             <button
               onClick={() => sendPumpCommand('ON')}
@@ -227,44 +225,27 @@ export default function Irrigation() {
 
           <hr style={{ opacity: 0.15 }} />
 
-          <h3>Auto mode</h3>
-          <p>
-            Status: <strong>{autoOn ? '✅ Enabled' : '⏸ Disabled'}</strong>
-            <button
-              onClick={() => setAutoOn(v => !v)}
-              style={{
-                marginLeft: '1rem',
-                padding: '0.35rem 0.75rem',
-                background: autoOn ? 'var(--primary)' : 'var(--surface-hover)',
-                border: 'none', borderRadius: 6, color: 'white', cursor: 'pointer',
-              }}
-            >
-              {autoOn ? 'Disable' : 'Enable'}
-            </button>
-          </p>
-
-          <p>
+          <p style={{ marginTop: '1rem' }}>
             Soil moisture:{' '}
             <strong>{currentMoisture !== null ? `${moisture}%` : '—'}</strong>
           </p>
 
-          <p>
-            Weather check:{' '}
-            <strong>{rainWarning ? '⚠️ Rain forecast — irrigation paused' : '✅ Clear'}</strong>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Thresholds: start at <strong style={{ color: 'var(--text)' }}>{thresholdLow}%</strong>,
+            stop at <strong style={{ color: 'var(--text)' }}>{thresholdHigh}%</strong>
           </p>
 
-          {shouldIrrigate && (
-            <p style={{ color: 'var(--accent)' }}>
-              ▶ Auto-irrigating (moisture {moisture}% is below {thresholdLow}%)
-            </p>
-          )}
+          <p>
+            Weather check:{' '}
+            <strong>{rainWarning ? '⚠️ Rain forecast — delay irrigation' : '✅ Clear'}</strong>
+          </p>
         </div>
 
         {/* ── Thresholds card ── */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Crop thresholds</h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 0 }}>
-            Saved to MongoDB. ESP32 fetches and applies them within 30 s.
+            Saved to MongoDB. ESP32 fetches and applies them within 30s.
           </p>
 
           <label style={{ display: 'block', marginBottom: '0.75rem' }}>
@@ -285,7 +266,6 @@ export default function Irrigation() {
             />
           </label>
 
-          {/* PUT /api/threshold/:deviceId → ESP picks up within 30s */}
           <button
             onClick={saveThresholds}
             disabled={savingThreshold}
@@ -300,7 +280,7 @@ export default function Irrigation() {
           </button>
 
           <p style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            ESP32 <code>{deviceId}</code> will apply new values within 30 s.
+            ESP32 <code>{deviceId}</code> will apply new values within 30s.
           </p>
         </div>
       </div>
