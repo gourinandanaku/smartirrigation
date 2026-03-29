@@ -21,7 +21,7 @@ export default function CropCard({
 
         <div className="meta-row">
           <span className="muted">Price</span>
-          <strong>${formatMoney(crop.pricePerKg)}/kg</strong>
+          <strong>₹{formatMoney(crop.pricePerKg)}/kg</strong>
         </div>
         <div className="meta-row">
           <span className="muted">Available</span>

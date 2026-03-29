@@ -32,6 +32,7 @@ export type MarketplaceContextValue = {
   removeFromCart: (cropId: string) => void
   clearCart: () => void
   placeOrderFromCart: (paymentMethod: 'COD' | 'ONLINE') => Promise<any>
+  cancelOrder: (orderId: string) => Promise<void>
 
   // farmer/admin mutations
   addCropListing: (input: {

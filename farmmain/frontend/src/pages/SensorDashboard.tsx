@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
@@ -29,18 +29,68 @@ export default function SensorDashboard() {
   const [searchParams] = useSearchParams()
 
   // URL params passed from FarmPlots when clicking "Open dashboard →"
-  const plotId   = searchParams.get('plot')     || ''
-  const deviceId = searchParams.get('device')   || ''
-  const location = searchParams.get('location') || ''   // "lat, lon" string
-  const plotName = searchParams.get('name')     || 'Plot'
+  const deviceIdFromUrl = searchParams.get('device') || ''
+  const plotIdFromUrl   = searchParams.get('plot')   || ''
+  const locationFromUrl = searchParams.get('location') || ''
+  const plotNameFromUrl = searchParams.get('name')     || ''
+  
+  // State for active plot (either from URL or storage)
+  const [deviceId, setDeviceId] = useState(deviceIdFromUrl)
+  const [plotId, setPlotId]     = useState(plotIdFromUrl)
+  const [location, setLocation] = useState(locationFromUrl)
+  const [plotName, setPlotName] = useState(plotNameFromUrl)
 
   const [activeTab, setActiveTab] = useState<TabType>('sensors')
+  const [availablePlots, setAvailablePlots] = useState<any[]>([])
+  const [showPlotSelector, setShowPlotSelector] = useState(false)
+
+  // 1. Sync from URL → Storage
+  useEffect(() => {
+    if (deviceIdFromUrl) {
+      const plotData = { deviceId: deviceIdFromUrl, plotId: plotIdFromUrl, location: locationFromUrl, name: plotNameFromUrl }
+      localStorage.setItem('activePlot', JSON.stringify(plotData))
+      setDeviceId(deviceIdFromUrl)
+      setPlotId(plotIdFromUrl)
+      setLocation(locationFromUrl)
+      setPlotName(plotNameFromUrl)
+    } else {
+      // 2. Try to load from Storage if URL is empty
+      const saved = localStorage.getItem('activePlot')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        setDeviceId(parsed.deviceId)
+        setPlotId(parsed.plotId)
+        setLocation(parsed.location)
+        setPlotName(parsed.name)
+      }
+    }
+  }, [deviceIdFromUrl, plotIdFromUrl, locationFromUrl, plotNameFromUrl])
+
+  // 3. Always load all plots for the Change Plot selector
+  useEffect(() => {
+    fetch('http://localhost:5000/api/plots')
+      .then(res => res.json())
+      .then(data => { if (data.success) setAvailablePlots(data.data || []) })
+      .catch(() => {})
+  }, [])
+
+  function switchPlot(p: any) {
+    const plotData = { deviceId: p.deviceId, plotId: p._id, location: p.location, name: p.name }
+    localStorage.setItem('activePlot', JSON.stringify(plotData))
+    setDeviceId(p.deviceId)
+    setPlotId(p._id)
+    setLocation(p.location)
+    setPlotName(p.name)
+    setHistory([])
+    setShowPlotSelector(false)
+  }
 
   // ── Sensor state ──────────────────────────────────────────────────────────
   const [sensors, setSensors] = useState({
     soilMoisture: 0,
     temperature: 0,
     humidity: 0,
+    pumpRunning: false,
     updated: new Date().toISOString(),
   })
   const [sensorError, setSensorError] = useState<string | null>(null)
@@ -81,6 +131,7 @@ export default function SensorDashboard() {
           soilMoisture: Number(latest.soilMoisture ?? 0),
           temperature:  Number(latest.temperature  ?? 0),
           humidity:     Number(latest.humidity     ?? 0),
+          pumpRunning:  latest.pumpRunning ?? false,
           updated:      latest.createdAt ?? new Date().toISOString()
         })
       } catch (err) {
@@ -179,8 +230,10 @@ export default function SensorDashboard() {
         const res = await fetch(`http://localhost:5000/api/threshold/${deviceId}`)
         if (!res.ok) return
         const data = await res.json()
-        setThresholdLow(data.start)
-        setThresholdHigh(data.stop)
+        if (data.success && data.data) {
+          setThresholdLow(data.data.start)
+          setThresholdHigh(data.data.stop)
+        }
       } catch {
         // use defaults
       }
@@ -191,7 +244,9 @@ export default function SensorDashboard() {
         const res = await fetch(`http://localhost:5000/api/pump/${deviceId}`)
         if (!res.ok) return
         const data = await res.json()
-        setPumpStatus(data.status === 'ON' ? 'ON' : 'OFF')
+        if (data.success && data.data) {
+          setPumpStatus(data.data.status === 'ON' ? 'ON' : 'OFF')
+        }
       } catch {
         // ignore
       }
@@ -274,18 +329,85 @@ export default function SensorDashboard() {
 
   if (!deviceId) {
     return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        ⚠️ Device ID missing. Please open the dashboard from a plot card.
+      <div className="section">
+        <h1>Monitoring Dashboard</h1>
+        <div className="form" style={{ textAlign: 'left', maxWidth: 600 }}>
+          <h2>📡 Not Connected</h2>
+          <p className="muted">Please select a plot to view its live sensor data.</p>
+          {availablePlots.length === 0 ? (
+            <div>
+              <p>No plots found. Please add a plot first.</p>
+              <Link to="/dashboard/plots" className="btn btn--primary">Go to Farm Plots</Link>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '10px', marginTop: '1rem' }}>
+              <div className="label">Available Plots</div>
+              {availablePlots.map((p: any) => (
+                <button
+                  key={p._id}
+                  className="btn"
+                  style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                  onClick={() => switchPlot(p)}
+                >
+                  🌾 {p.name} <span className="muted" style={{ marginLeft: 'auto', fontSize: '0.8rem' }}>(Device: {p.deviceId})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Plot Dashboard: {plotName}</h1>
-      <p style={{ color: 'var(--text-muted)' }}>
-        Plot #{plotId} · Device: <code>{deviceId}</code> · Location: {location}
-      </p>
+      {/* ── Header with Change Plot button ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '4px' }}>
+        <div>
+          <h1 style={{ marginTop: 0, marginBottom: 4 }}>Plot Dashboard: {plotName}</h1>
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>
+            Plot #{plotId} · Device: <code>{deviceId}</code> · Location: {location}
+          </p>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <button
+            className="btn"
+            onClick={() => setShowPlotSelector(v => !v)}
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            🔄 Change Plot
+          </button>
+          {showPlotSelector && (
+            <div style={{
+              position: 'absolute', right: 0, top: '110%', zIndex: 100,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: '12px', boxShadow: 'var(--shadow)',
+              minWidth: 260, padding: '8px',
+              display: 'flex', flexDirection: 'column', gap: '6px',
+            }}>
+              <div className="label" style={{ padding: '4px 8px' }}>Switch to Plot</div>
+              {availablePlots.length === 0 && (
+                <p style={{ padding: '4px 8px', margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>No other plots found.</p>
+              )}
+              {availablePlots.map((p: any) => (
+                <button
+                  key={p._id}
+                  className="btn"
+                  style={{
+                    textAlign: 'left', justifyContent: 'flex-start',
+                    background: p.deviceId === deviceId ? 'var(--accent-bg)' : undefined,
+                    borderColor: p.deviceId === deviceId ? 'var(--accent-border)' : undefined,
+                  }}
+                  onClick={() => switchPlot(p)}
+                >
+                  🌾 {p.name}
+                  {p.deviceId === deviceId && <span style={{ marginLeft: 'auto', fontSize: '0.75rem' }}>✓ Active</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Tab Bar */}
       <div style={{
@@ -351,9 +473,11 @@ export default function SensorDashboard() {
 
             <div className="card" style={{ minWidth: 180 }}>
               <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pump Status</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{pumpStatus}</div>
-              <span className={`badge badge--${pumpStatus === 'ON' ? 'success' : 'warning'}`}>
-                {pumpStatus === 'ON' ? 'irrigating' : 'idle'}
+              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+                {sensors.pumpRunning ? 'RUNNING' : 'STOPPED'}
+              </div>
+              <span className={`badge badge--${sensors.pumpRunning ? 'success' : 'warning'}`}>
+                {sensors.pumpRunning ? 'irrigating' : 'idle'}
               </span>
             </div>
           </div>

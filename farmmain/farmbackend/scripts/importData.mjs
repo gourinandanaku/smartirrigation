@@ -25,7 +25,7 @@ const REALISTIC_NAMES = [
 
 // Helper: Random item generator
 export const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
-export const getRandomLocation = () => getRandom(["Nairobi", "Kiambu", "Mombasa", "Nakuru", "Chennai", "Coimbatore", "Palakkad", "Ernakulam"]);
+export const getRandomLocation = () => getRandom(["Wayanad", "Palakkad", "Kochi", "Ernakulam", "Idukki", "Alleppey", "Kottayam", "Thrissur"]);
 
 export const transformData = (rawDataArray) => {
   return rawDataArray.map(item => {

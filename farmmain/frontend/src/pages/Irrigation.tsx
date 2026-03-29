@@ -1,17 +1,65 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 
 // FR2: Auto control irrigation based on soil moisture thresholds and weather
 
 export default function Irrigation() {
   const [searchParams] = useSearchParams()
-  const plotId   = searchParams.get('plot')     || ''
-  const location = searchParams.get('location') || 'Unknown location'
-  const plotName = searchParams.get('name')     || 'Plot'
-  const deviceId = searchParams.get('device')   || ''   // ← was missing entirely
+  const deviceIdFromUrl = searchParams.get('device')   || ''
+  const plotIdFromUrl   = searchParams.get('plot')     || ''
+  const locationFromUrl = searchParams.get('location') || ''
+  const plotNameFromUrl = searchParams.get('name')     || ''
+
+  // State for active plot (either from URL or storage)
+  const [deviceId, setDeviceId] = useState(deviceIdFromUrl)
+  const [plotId, setPlotId]     = useState(plotIdFromUrl)
+  const [location, setLocation] = useState(locationFromUrl)
+  const [plotName, setPlotName] = useState(plotNameFromUrl)
+
+  const [availablePlots, setAvailablePlots] = useState<any[]>([])
+  const [loadingPlots, setLoadingPlots]     = useState(false)
+
+  // 1. Sync from URL → Storage
+  useEffect(() => {
+    if (deviceIdFromUrl) {
+      const plotData = { deviceId: deviceIdFromUrl, plotId: plotIdFromUrl, location: locationFromUrl, name: plotNameFromUrl }
+      localStorage.setItem('activePlot', JSON.stringify(plotData))
+      setDeviceId(deviceIdFromUrl)
+      setPlotId(plotIdFromUrl)
+      setLocation(locationFromUrl)
+      setPlotName(plotNameFromUrl)
+    } else {
+      // 2. Try to load from Storage if URL is empty
+      const saved = localStorage.getItem('activePlot')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        setDeviceId(parsed.deviceId)
+        setPlotId(parsed.plotId)
+        setLocation(parsed.location)
+        setPlotName(parsed.name)
+      }
+    }
+  }, [deviceIdFromUrl, plotIdFromUrl, locationFromUrl, plotNameFromUrl])
+
+  // 3. Load all plots if we still don't have a deviceId (for selection fallback)
+  useEffect(() => {
+    if (!deviceId) {
+      setLoadingPlots(true)
+      fetch('http://localhost:5000/api/plots')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setAvailablePlots(data.data || []);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingPlots(false))
+    }
+  }, [deviceId])
 
   // ── Pump state ────────────────────────────────────────────────────────────
   const [pumpStatus, setPumpStatus]   = useState<'ON' | 'OFF'>('OFF')
+  const [pumpUpdatedAt, setPumpUpdatedAt] = useState<string | null>(null)
   const [autoOn, setAutoOn]           = useState(true)
 
   // ── Thresholds (loaded from DB, saved back to DB → ESP picks up in 30s) ──
@@ -37,8 +85,10 @@ export default function Irrigation() {
     fetch(`http://localhost:5000/api/threshold/${deviceId}`)
       .then(res => res.json())
       .then(data => {
-        setThresholdLow(data.start)
-        setThresholdHigh(data.stop)
+        if (data.success && data.data) {
+          setThresholdLow(data.data.start)
+          setThresholdHigh(data.data.stop)
+        }
       })
       .catch(() => {})   // keep defaults on error
   }, [deviceId])
@@ -52,7 +102,12 @@ export default function Irrigation() {
 
     fetch(`http://localhost:5000/api/pump/${deviceId}`)
       .then(res => res.json())
-      .then(data => setPumpStatus(data.status === 'ON' ? 'ON' : 'OFF'))
+      .then(data => {
+        if (data.success && data.data) {
+          setPumpStatus(data.data.status === 'ON' ? 'ON' : 'OFF')
+          setPumpUpdatedAt(data.data.updatedAt)
+        }
+      })
       .catch(() => {})
   }, [deviceId])
 
@@ -167,8 +222,44 @@ export default function Irrigation() {
 
   if (!deviceId) {
     return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        ⚠️ Device ID missing. Open irrigation from a plot card link.
+      <div className="section">
+        <h1>Irrigation Control</h1>
+        <div className="form" style={{ textAlign: 'left', maxWidth: 600 }}>
+          <h2>📡 Not Connected</h2>
+          <p className="muted">
+            Please select a plot to manage its irrigation.
+          </p>
+          
+          {loadingPlots ? (
+            <p>Loading your farm plots...</p>
+          ) : availablePlots.length === 0 ? (
+            <div>
+              <p>No plots found. Please add a plot first.</p>
+              <Link to="/dashboard/plots" className="btn btn--primary">Go to Farm Plots</Link>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '10px', marginTop: '1rem' }}>
+              <div className="label">Available Plots</div>
+              {availablePlots.map((p: any) => (
+                <button 
+                  key={p._id} 
+                  className="btn" 
+                  style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                  onClick={() => {
+                    const plotData = { deviceId: p.deviceId, plotId: p._id, location: p.location, name: p.name }
+                    localStorage.setItem('activePlot', JSON.stringify(plotData))
+                    setDeviceId(p.deviceId)
+                    setPlotId(p._id)
+                    setLocation(p.location)
+                    setPlotName(p.name)
+                  }}
+                >
+                  🌾 {p.name} <span className="muted" style={{ marginLeft: 'auto', fontSize: '0.8rem' }}> (Device: {p.deviceId})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -196,6 +287,11 @@ export default function Irrigation() {
               {pumpStatus}
             </strong>
           </p>
+          {pumpUpdatedAt && (
+             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: -10 }}>
+               Last updated: {new Date(pumpUpdatedAt).toLocaleString()}
+             </p>
+          )}
 
           {/* Manual buttons → POST /api/pump → ESP relay toggles within 4s */}
           <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>

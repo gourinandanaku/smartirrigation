@@ -13,7 +13,7 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon
 
-const crops = ["Tomato", "Wheat", "Rice", "Corn", "Soybean", "Cotton", "Potato", "Maize", "Sugarcane"]
+// Removed static crops array, now fetched from DB
 
 // Flies map to searched location
 function FlyToLocation({ coords }: { coords: [number, number] | null }) {
@@ -41,7 +41,7 @@ function LocationMarker({ setFormData, searchCoords }: any) {
   }, [searchCoords])
 
   useMapEvents({
-    click(e) {
+    click(e: any) {
       const { lat, lng } = e.latlng
       const pos: [number, number] = [lat, lng]
       setPosition(pos)
@@ -134,6 +134,7 @@ type Plot = {
 
 export default function FarmPlots() {
   const [plots, setPlots] = useState<Plot[]>([])
+  const [crops, setCrops] = useState<string[]>([])
   const [showForm, setShowForm] = useState(false)
   const [searchCoords, setSearchCoords] = useState<[number, number] | null>(null)
 
@@ -146,12 +147,36 @@ export default function FarmPlots() {
     deviceId: "",
   })
 
-  // Fetch all plots on mount
   useEffect(() => {
     fetch("http://localhost:5000/api/plots")
       .then(res => res.json())
-      .then(data => setPlots(data))
+      .then(data => {
+        if (data.success) {
+          setPlots(data.data || []);
+        } else {
+          console.error("Failed to fetch plots:", data.message);
+        }
+      })
       .catch(err => console.log(err))
+
+    // Fetch crop names from both sources and merge
+    const thresholdsPromise = fetch("http://localhost:5000/api/crop-thresholds")
+      .then(res => res.json())
+      .then(data => (data.success && data.data ? data.data.map((t: any) => t.cropName) : []))
+      .catch(() => [])
+
+    const marketplaceCropsPromise = fetch("http://localhost:5000/api/crops")
+      .then(res => res.json())
+      .then(data => {
+        const list = data.data || data
+        return Array.isArray(list) ? list.map((c: any) => c.name).filter(Boolean) : []
+      })
+      .catch(() => [])
+
+    Promise.all([thresholdsPromise, marketplaceCropsPromise]).then(([thresholdNames, marketplaceNames]) => {
+      const merged = Array.from(new Set([...thresholdNames, ...marketplaceNames])).sort()
+      setCrops(merged)
+    })
   }, [])
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -173,13 +198,17 @@ export default function FarmPlots() {
         body: JSON.stringify(formData)
       })
       const data = await res.json()
-      setPlots(prev => [...prev, data])
-      setFormData({ name: "", crop: "", location: "", latitude: null, longitude: null, deviceId: "" })
-      setSearchCoords(null)
-      setShowForm(false)
+      if (data.success) {
+        setPlots(prev => [...prev, data.data])
+        setFormData({ name: "", crop: "", location: "", latitude: null, longitude: null, deviceId: "" })
+        setSearchCoords(null)
+        setShowForm(false)
+      } else {
+        alert(`Failed to add plot: ${data.error || data.message || 'Unknown error'}`)
+      }
     } catch (error) {
       console.error(error)
-      alert("Failed to add plot")
+      alert("Failed to add plot due to network error")
     }
   }
 

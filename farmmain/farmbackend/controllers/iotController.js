@@ -6,8 +6,8 @@ const Pump = require('../models/Pump');
 // @route   POST /api/sensor
 const saveSensorData = async (req, res) => {
   try {
-    const { deviceId, temperature, humidity, soilMoisture } = req.body;
-    const data = new Sensor({ deviceId, temperature, humidity, soilMoisture });
+    const { deviceId, temperature, humidity, soilMoisture, pumpRunning } = req.body;
+    const data = new Sensor({ deviceId, temperature, humidity, soilMoisture, pumpRunning });
     await data.save();
     res.status(201).json({ success: true, message: "Sensor data saved" });
   } catch (err) {
@@ -62,7 +62,13 @@ const updatePumpStatus = async (req, res) => {
 const getPumpStatus = async (req, res) => {
   try {
     const pump = await Pump.findOne({ deviceId: req.params.deviceId });
-    res.json({ success: true, data: { status: pump ? pump.status : "OFF" } });
+    res.json({ 
+      success: true, 
+      data: { 
+        status: pump ? pump.status : "OFF",
+        updatedAt: pump ? pump.updatedAt : null 
+      } 
+    });
   } catch (err) {
     res.json({ success: true, data: { status: "OFF" } });
   }

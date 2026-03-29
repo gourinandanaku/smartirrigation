@@ -8,13 +8,7 @@ export default function FlashBanner({
   onDismiss: () => void
 }) {
   if (!flash) return null
-
-  const className =
-    flash.type === 'success'
-      ? 'flash flash--success'
-      : flash.type === 'error'
-        ? 'flash flash--error'
-        : 'flash flash--info'
+  const className = `flash flash--${flash.type}`
 
   return (
     <div className={className} role={flash.type === 'error' ? 'alert' : 'status'}>

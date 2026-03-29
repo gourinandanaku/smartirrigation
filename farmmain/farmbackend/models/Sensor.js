@@ -18,6 +18,10 @@ const sensorSchema = new mongoose.Schema({
     type: Number, 
     required: [true, 'Soil moisture is required'] 
   },
+  pumpRunning: {
+    type: Boolean,
+    default: false
+  },
   // Ensure the TTL Index automatically purges stale sensor data after 7 Days
   createdAt: { 
     type: Date, 

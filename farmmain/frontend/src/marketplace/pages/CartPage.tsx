@@ -48,7 +48,7 @@ export default function CartPage() {
           <p className="muted">Your Smart Farm order has been successfully placed.</p>
           <div style={{ background: 'var(--surface-2)', padding: 16, borderRadius: 10, marginTop: 16 }}>
             <p><strong>Order ID:</strong> {placedOrder._id}</p>
-            <p><strong>Total Paid:</strong> ${formatMoney(placedOrder.totalAmount)}</p>
+            <p><strong>Total Paid:</strong> ₹{formatMoney(placedOrder.totalAmount)}</p>
             <p><strong>Payment Method:</strong> {placedOrder.paymentMethod}</p>
             <p>
                <strong>Payment Status:</strong> 
@@ -81,7 +81,7 @@ export default function CartPage() {
             </div>
             <div>
               <div className="label">Subtotal</div>
-              <div style={{ fontWeight: 900, color: 'var(--heading)' }}>${formatMoney(cartSubtotal)}</div>
+              <div style={{ fontWeight: 900, color: 'var(--heading)' }}>₹{formatMoney(cartSubtotal)}</div>
             </div>
           </div>
 
@@ -184,8 +184,8 @@ export default function CartPage() {
                       In stock: {crop.quantityAvailable} kg
                     </div>
                   </td>
-                  <td>${formatMoney(crop.pricePerKg)}/kg</td>
-                  <td style={{ fontWeight: 900 }}>${formatMoney(crop.pricePerKg * quantity)}</td>
+                  <td>₹{formatMoney(crop.pricePerKg)}/kg</td>
+                  <td style={{ fontWeight: 900 }}>₹{formatMoney(crop.pricePerKg * quantity)}</td>
                   <td>
                     <button className="btn btn--danger" onClick={() => removeFromCart(crop.id)}>
                       Remove

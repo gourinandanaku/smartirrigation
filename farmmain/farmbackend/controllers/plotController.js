@@ -5,7 +5,17 @@ const CropThreshold = require('../models/CropThreshold');
 // @route   POST /api/plots
 const addPlot = async (req, res) => {
   try {
-    const { crop, startThreshold, stopThreshold } = req.body;
+    const { crop, deviceId, startThreshold, stopThreshold } = req.body;
+
+    // Check if device already exists
+    const existingPlot = await Plot.findOne({ deviceId });
+    if (existingPlot) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Device ID '${deviceId}' is already assigned to plot '${existingPlot.name}'.`,
+        error: "Duplicate Device ID"
+      });
+    }
     
     let start = startThreshold;
     let stop = stopThreshold;
@@ -30,7 +40,11 @@ const addPlot = async (req, res) => {
     await plot.save();
     res.status(201).json({ success: true, data: plot });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Error creating plot", error: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message, // Send the actual message
+      error: "Plot Creation Failed" 
+    });
   }
 };
 

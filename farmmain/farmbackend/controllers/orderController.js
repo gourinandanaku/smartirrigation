@@ -100,4 +100,37 @@ const createOrder = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, getOrders };
+// @desc    Cancel an order & restore stock
+// @route   PUT /api/orders/:id/cancel
+// @access  Public
+const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.orderStatus !== 'placed') {
+      return res.status(400).json({ success: false, message: `Cannot cancel order in '${order.orderStatus}' status` });
+    }
+
+    // Step 1: Restore stock
+    for (const item of order.items) {
+      await Crop.findByIdAndUpdate(item.cropId, { $inc: { quantity: item.quantity } });
+      console.log(`[Order Cancelled] Restored ${item.quantity}kg of Crop ID ${item.cropId}`);
+    }
+
+    // Step 2: Update order status
+    order.orderStatus = 'cancelled';
+    await order.save();
+
+    res.status(200).json({ success: true, data: order });
+  } catch (error) {
+    console.error(`[Order Cancellation Failed] ${error.message}`);
+    res.status(500).json({ success: false, message: 'Server error during order cancellation', error: error.message });
+  }
+};
+
+module.exports = { createOrder, getOrders, cancelOrder };

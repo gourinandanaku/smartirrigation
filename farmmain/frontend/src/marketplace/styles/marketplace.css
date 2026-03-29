@@ -144,41 +144,45 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-/* Flash banner */
+/* Flash banner - Centered Original Design */
 .flash {
   position: fixed;
-  left: 16px;
-  top: 76px;
-  z-index: 50;
+  left: 50%;
+  top: 20px;
+  transform: translateX(-50%);
+  z-index: 1000;
   width: min(520px, calc(100vw - 32px));
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 12px;
   box-shadow: var(--shadow);
-  padding: 12px;
+  padding: 16px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 20px;
+  backdrop-filter: blur(8px);
 }
 
 .flash__message {
   font-weight: 650;
   color: var(--text);
+  font-size: 1rem;
 }
 
 .flash__close {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 6px 12px;
   cursor: pointer;
+  font-size: 14px;
 }
 
 .flash--success {
   border-color: rgba(46, 125, 50, 0.35);
-  background: rgba(46, 125, 50, 0.08);
+  background: rgba(46, 125, 50, 0.12);
 }
 
 .flash--error {

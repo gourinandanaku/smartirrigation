@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
                   <tr key={c.id}>
                     <td style={{ fontWeight: 900, color: 'var(--heading)' }}>{c.name}</td>
                     <td>{usersById.get(c.farmerId) ?? 'Farmer'}</td>
-                    <td>${formatMoney(c.pricePerKg)}/kg</td>
+                    <td>₹{formatMoney(c.pricePerKg)}/kg</td>
                     <td>{c.quantityAvailable}</td>
                     <td>{c.location}</td>
                     <td>

@@ -1,8 +1,12 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useMarketplace } from '../marketplace/state/useMarketplace'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/dashboard/sensors', label: 'Monitoring Dashboard' },
+  { to: '/dashboard/irrigation', label: 'Irrigation Control' },
+  { to: '/dashboard/history', label: 'Activity History' },
   { to: '/dashboard/disease', label: 'Disease Detection' },
   { to: '/dashboard/crops', label: 'Crop Details' },
   { to: '/dashboard/plots', label: 'Farm Plots' },
@@ -11,6 +15,16 @@ const navItems = [
 
 export default function Layout() {
   const { currentUser, logout: contextLogout } = useMarketplace();
+  const location = useLocation();
+  const [activePlotName, setActivePlotName] = useState<string | null>(null);
+
+  // Update active plot name from storage on every navigation
+  useEffect(() => {
+    const saved = localStorage.getItem('activePlot');
+    if (saved) {
+      setActivePlotName(JSON.parse(saved).name);
+    }
+  }, [location]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -30,15 +44,22 @@ export default function Layout() {
       </header>
 
       <div style={{ display: 'flex', flex: 1 }}>
-        <aside style={{
+        <aside className="sidebar-main" style={{
           width: 220,
           background: 'var(--surface)',
           padding: '1rem 0',
           borderRight: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.5rem'
+          gap: '1rem'
         }}>
+          {activePlotName && (
+            <div style={{ padding: '0 1rem', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Connected To</div>
+              <div style={{ fontWeight: 600, color: 'var(--accent)', marginTop: '4px' }}>🌾 {activePlotName}</div>
+            </div>
+          )}
+          
           <nav>
             {navItems.map(({ to, label }) => (
               <NavLink

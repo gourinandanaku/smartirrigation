@@ -25,13 +25,18 @@ const cropRoutes = require("./routes/cropRoutes")
 const orderRoutes = require("./routes/orderRoutes")
 const plotRoutes = require("./routes/plotRoutes")
 const iotRoutes = require("./routes/iotRoutes")
+const { getCropThresholds, createCropThreshold } = require("./controllers/plotController")
 
 // Mount Routes
 app.use("/api/auth", authRoutes)
 app.use("/api/crops", cropRoutes)
 app.use("/api/orders", orderRoutes)
-app.use("/api", plotRoutes) // Plots and thresholds
+app.use("/api/plots", plotRoutes)  // Plots CRUD
 app.use("/api", iotRoutes)  // Sensors, pumps, and weather
+
+// Standalone crop-thresholds route (used by FarmPlots dropdown)
+app.get("/api/crop-thresholds", getCropThresholds)
+app.post("/api/crop-thresholds", createCropThreshold)
 
 // Error Handling Middleware
 const { errorHandler } = require('./middleware/errorMiddleware')

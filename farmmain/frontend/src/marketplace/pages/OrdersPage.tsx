@@ -4,7 +4,7 @@ import { useMarketplace } from '../state/useMarketplace'
 import { formatDate } from '../utils/format'
 
 export default function OrdersPage() {
-  const { orders, currentUser } = useMarketplace()
+  const { orders, currentUser, cancelOrder } = useMarketplace()
 
   const myOrders = useMemo(() => {
     if (currentUser.role !== 'buyer') return []
@@ -59,6 +59,7 @@ export default function OrdersPage() {
                 <th>Quantity (kg)</th>
                 <th>Status</th>
                 <th>Placed</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -84,6 +85,21 @@ export default function OrdersPage() {
                     </span>
                   </td>
                   <td className="muted">{formatDate(o.createdAt)}</td>
+                  <td>
+                    {o.status === 'Placed' && (
+                      <button
+                        className="btn btn--danger"
+                        style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '8px' }}
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to cancel your order for ${o.cropName}?`)) {
+                            cancelOrder(o.id)
+                          }
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -93,4 +109,3 @@ export default function OrdersPage() {
     </div>
   )
 }
-

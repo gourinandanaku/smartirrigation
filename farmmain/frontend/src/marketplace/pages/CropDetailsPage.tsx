@@ -33,7 +33,7 @@ export default function CropDetailsPage() {
             <h1 style={{ margin: 0 }}>{crop.name}</h1>
             <div className="meta-row">
               <span className="muted">Price</span>
-              <strong>${formatMoney(crop.pricePerKg)}/kg</strong>
+              <strong>₹{formatMoney(crop.pricePerKg)}/kg</strong>
             </div>
             <div className="meta-row">
               <span className="muted">Available</span>

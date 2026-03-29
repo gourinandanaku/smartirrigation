@@ -121,7 +121,7 @@ export default function FarmerDashboardPage() {
 
               <div className="field">
                 <label className="label" htmlFor="price">
-                  Price per kg ($)
+                  Price per kg (₹)
                 </label>
                 <input
                   id="price"
@@ -230,7 +230,7 @@ function FarmerCropRow({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 950, color: 'var(--heading)' }}>{crop.name}</div>
           <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-            {crop.location} · Harvest {formatDate(crop.harvestDate)} · ${formatMoney(crop.pricePerKg)}/kg
+            {crop.location} · Harvest {formatDate(crop.harvestDate)} · ₹{formatMoney(crop.pricePerKg)}/kg
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
             Current stock: <strong style={{ color: 'var(--heading)' }}>{crop.quantityAvailable} kg</strong>

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { CartItem, Crop, Order, SessionState, User } from '../data/types'
 import { MarketplaceContext, type FlashState, type MarketplaceContextValue } from './MarketplaceContext'
-import { getCrops, addCrop, deleteCrop as apiDeleteCrop, updateCrop as apiUpdateCrop, placeOrder as apiPlaceOrder, getOrders } from '../services/api'
+import { getCrops, addCrop, deleteCrop as apiDeleteCrop, updateCrop as apiUpdateCrop, placeOrder as apiPlaceOrder, getOrders, cancelOrder as apiCancelOrder } from '../services/api'
 
 type FlashType = NonNullable<FlashState>['type']
 
@@ -104,6 +104,8 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
         const mappedOrders: Order[] = [];
         for (const order of data) {
           if (!order.items) continue;
+          // Skip cancelled orders — they should not appear in the list
+          if (order.orderStatus === 'cancelled') continue;
           for (const item of order.items) {
             const crop = item.cropId;
             if (!crop) continue;
@@ -118,7 +120,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
               quantity: item.quantity,
               unitPrice: crop.price,
               totalPrice: crop.price * item.quantity,
-              status: order.orderStatus === 'placed' ? 'Placed' : (order.orderStatus === 'confirmed' ? 'Processing' : (order.orderStatus === 'cancelled' ? 'Cancelled' : 'Delivered')),
+              status: order.orderStatus === 'placed' ? 'Placed' : (order.orderStatus === 'confirmed' ? 'Processing' : 'Delivered'),
               createdAt: order.createdAt
             });
           }
@@ -127,6 +129,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       })
       .catch((err) => console.error("Failed to load orders from API", err))
   }, [])
+
 
   // persist
   useEffect(() => {
@@ -287,6 +290,35 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     }
   }
 
+  async function cancelOrder(orderId: string) {
+    try {
+      // The composite ID is: "<mongoOrderId>_<mongoCropId>"
+      // MongoDB ObjectIds are exactly 24 hex chars, no underscores
+      const baseOrderId = orderId.substring(0, 24);
+      console.log('[cancelOrder] composite:', orderId, '→ baseOrderId:', baseOrderId);
+      await apiCancelOrder(baseOrderId);
+
+      // Remove all rows that belong to this order from the list
+      setOrders(prev => prev.filter(o => !o.id.startsWith(baseOrderId)));
+
+      // Restore local crop stock for all cancelled rows
+      const cancelledItems = orders.filter(o => o.id.startsWith(baseOrderId));
+      setCrops(prev => prev.map(c => {
+        const item = cancelledItems.find(ci => ci.cropId === c.id);
+        if (item) {
+          return { ...c, quantityAvailable: c.quantityAvailable + item.quantity };
+        }
+        return c;
+      }));
+
+      pushFlash('Order cancelled successfully. Stock restored.', 'success');
+    } catch (err) {
+      console.error('Cancellation failed:', err);
+      pushFlash('Failed to cancel order. Please try again.', 'error');
+      throw err;
+    }
+  }
+
   async function addCropListing(input: {
     name: string
     quantityAvailable: number
@@ -402,6 +434,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     removeFromCart,
     clearCart,
     placeOrderFromCart,
+    cancelOrder,
     addCropListing,
     updateCropStock,
     deleteCrop,
