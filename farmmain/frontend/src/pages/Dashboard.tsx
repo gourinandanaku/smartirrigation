@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 
 const quickLinks = [
-  { to: '/disease', label: 'Disease detection', desc: 'Upload leaf images for AI analysis' },
-  { to: '/crops', label: 'Crop details', desc: 'Optimal ranges & fertilizer suggestions' },
-  { to: '/plots', label: 'Farm plots', desc: 'Multiple plots, separate dashboards' },
-  { to: '/marketplace', label: 'Marketplace', desc: 'List & buy products' },
+  { to: '/dashboard/disease', label: 'Disease detection', desc: 'Upload leaf images for AI analysis' },
+  { to: '/dashboard/crops', label: 'Crop details', desc: 'Optimal ranges & fertilizer suggestions' },
+  { to: '/dashboard/plots', label: 'Farm plots', desc: 'Multiple plots, separate dashboards' },
+  { to: '/', label: 'Marketplace', desc: 'List & buy products' },
 ]
 
 export default function Dashboard() {

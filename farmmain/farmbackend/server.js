@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require("express")
 const mongoose = require("mongoose")
 const cors = require("cors")
@@ -12,6 +13,8 @@ app.use(express.json())
 // MongoDB Connection
 // ==============================
 
+const authRoutes = require("./routes/authRoutes")
+
 mongoose.connect(
   "mongodb://user:user@ac-ynkznag-shard-00-00.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-01.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-02.dypnqbb.mongodb.net:27017/smartag?ssl=true&authSource=admin&replicaSet=atlas-ptkiw5-shard-0&retryWrites=true&w=majority"
 )
@@ -22,6 +25,9 @@ mongoose.connect(
   })
 })
 .catch(err => console.log(err))
+
+// Mount Routes
+app.use("/api/auth", authRoutes)
 
 // ==============================
 // Plot Schema
@@ -39,6 +45,8 @@ const plotSchema = new mongoose.Schema({
 })
 
 const Plot = mongoose.model("Plot", plotSchema)
+
+const CropThreshold = require('./models/CropThreshold')
 
 // ==============================
 // Sensor Schema
@@ -70,20 +78,8 @@ const pumpSchema = new mongoose.Schema({
 const Pump = mongoose.model("Pump", pumpSchema)
 
 // ==============================
-// Crop Thresholds
+// Plot Management
 // ==============================
-
-const cropThresholds = {
-  Rice:      { start: 60, stop: 80 },
-  Wheat:     { start: 40, stop: 60 },
-  Tomato:    { start: 50, stop: 70 },
-  Cotton:    { start: 45, stop: 65 },
-  Sugarcane: { start: 55, stop: 75 },
-  Maize:     { start: 50, stop: 70 },
-  Corn:      { start: 50, stop: 70 },
-  Soybean:   { start: 45, stop: 65 },
-  Potato:    { start: 55, stop: 75 }
-}
 
 // ==============================
 // Add Plot
@@ -91,13 +87,28 @@ const cropThresholds = {
 
 app.post("/api/plots", async (req, res) => {
   try {
-    const { crop } = req.body
-    const threshold = cropThresholds[crop] || { start: 40, stop: 70 }
+    const { crop, startThreshold, stopThreshold } = req.body;
+    
+    // If thresholds are NOT provided in body, try to find in DB
+    let start = startThreshold;
+    let stop = stopThreshold;
+    
+    if (start === undefined || stop === undefined) {
+      const dbThreshold = await CropThreshold.findOne({ cropName: crop });
+      if (dbThreshold) {
+        start = start === undefined ? dbThreshold.startThreshold : start;
+        stop = stop === undefined ? dbThreshold.stopThreshold : stop;
+      } else {
+        // Fallback defaults
+        start = start === undefined ? 40 : start;
+        stop = stop === undefined ? 70 : stop;
+      }
+    }
 
     const plot = new Plot({
       ...req.body,
-      startThreshold: threshold.start,
-      stopThreshold: threshold.stop
+      startThreshold: start,
+      stopThreshold: stop
     })
 
     await plot.save()
@@ -130,6 +141,29 @@ app.delete("/api/plots/:id", async (req, res) => {
     res.json({ message: "Plot deleted" })
   } catch (err) {
     res.status(500).json({ message: "Error deleting plot" })
+  }
+})
+
+// ==============================
+// Crop Threshold Management
+// ==============================
+
+app.get("/api/crop-thresholds", async (req, res) => {
+  try {
+    const thresholds = await CropThreshold.find()
+    res.json(thresholds)
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching thresholds" })
+  }
+})
+
+app.post("/api/crop-thresholds", async (req, res) => {
+  try {
+    const threshold = new CropThreshold(req.body)
+    await threshold.save()
+    res.json(threshold)
+  } catch (err) {
+    res.status(500).json({ message: "Error creating threshold" })
   }
 })
 

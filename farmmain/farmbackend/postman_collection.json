@@ -1,0 +1,37 @@
+{
+  "info": {
+    "name": "Marketplace API Verification",
+    "description": "Postman testing suite for Step 5 Verification",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get All Crops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/api/crops",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "crops"]
+        }
+      }
+    },
+    {
+      "name": "Get Simulated Orders",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/api/orders",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "orders"]
+        }
+      }
+    }
+  ]
+}

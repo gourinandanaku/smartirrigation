@@ -41,68 +41,7 @@ const daysFromNow = (n: number) => {
   return iso(d)
 }
 
-export const mockCrops: Crop[] = [
-  {
-    id: 'c_ginger',
-    name: 'Fresh Ginger',
-    pricePerKg: 6.5,
-    quantityAvailable: 80,
-    harvestDate: daysFromNow(-18),
-    location: 'Nairobi',
-    farmerId: 'u_farmer_1',
-    imageUrl: svgDataUri('Ginger', '#2f855a'),
-  },
-  {
-    id: 'c_tomatoes',
-    name: 'Sun-Ripe Tomatoes',
-    pricePerKg: 2.4,
-    quantityAvailable: 160,
-    harvestDate: daysFromNow(-6),
-    location: 'Nairobi',
-    farmerId: 'u_farmer_1',
-    imageUrl: svgDataUri('Tomatoes', '#2f6b3f'),
-  },
-  {
-    id: 'c_spinach',
-    name: 'Organic Spinach',
-    pricePerKg: 1.9,
-    quantityAvailable: 140,
-    harvestDate: daysFromNow(-2),
-    location: 'Kiambu',
-    farmerId: 'u_farmer_1',
-    imageUrl: svgDataUri('Spinach', '#2b7a3a'),
-  },
-  {
-    id: 'c_mango',
-    name: 'Sweet Mangoes',
-    pricePerKg: 3.2,
-    quantityAvailable: 60,
-    harvestDate: daysFromNow(-12),
-    location: 'Mombasa',
-    farmerId: 'u_farmer_2',
-    imageUrl: svgDataUri('Mangoes', '#2e7d32'),
-  },
-  {
-    id: 'c_oranges',
-    name: 'Citrus Oranges',
-    pricePerKg: 2.8,
-    quantityAvailable: 95,
-    harvestDate: daysFromNow(-9),
-    location: 'Nakuru',
-    farmerId: 'u_farmer_2',
-    imageUrl: svgDataUri('Oranges', '#276749'),
-  },
-  {
-    id: 'c_potatoes',
-    name: 'Washed Potatoes',
-    pricePerKg: 1.15,
-    quantityAvailable: 220,
-    harvestDate: daysFromNow(-25),
-    location: 'Nakuru',
-    farmerId: 'u_farmer_1',
-    imageUrl: svgDataUri('Potatoes', '#2f855a'),
-  },
-]
+export const mockCrops: Crop[] = []
 
 export const mockOrders: Order[] = []
 

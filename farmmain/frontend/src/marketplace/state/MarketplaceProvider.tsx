@@ -1,16 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { mockCrops, mockOrders, mockSession, mockUsers } from '../data/mockData'
 import type { CartItem, Crop, Order, SessionState, User } from '../data/types'
 import { MarketplaceContext, type FlashState, type MarketplaceContextValue } from './MarketplaceContext'
-import { getCrops, addCrop, deleteCrop as apiDeleteCrop, updateCrop as apiUpdateCrop, placeOrder as apiPlaceOrder } from '../services/api'
+import { getCrops, addCrop, deleteCrop as apiDeleteCrop, updateCrop as apiUpdateCrop, placeOrder as apiPlaceOrder, getOrders } from '../services/api'
 
 type FlashType = NonNullable<FlashState>['type']
 
 const LS = {
-  crops: 'sf_marketplace_crops_v1',
-  orders: 'sf_marketplace_orders_v1',
   cart: 'sf_marketplace_cart_v1',
-  session: 'sf_marketplace_session_v1',
+  user: 'sf_user',
+  token: 'sf_token'
 }
 
 function safeParseJSON<T>(value: string | null): T | null {
@@ -42,17 +40,11 @@ function makeId(prefix: string) {
 }
 
 export function MarketplaceProvider({ children }: { children: React.ReactNode }) {
-  const [users] = useState<User[]>(mockUsers)
+  const [users] = useState<User[]>([])
 
-  const [crops, setCrops] = useState<Crop[]>(() => {
-    const fromLS = safeParseJSON<Crop[]>(localStorage.getItem(LS.crops))
-    return fromLS && Array.isArray(fromLS) && fromLS.length ? fromLS : mockCrops
-  })
+  const [crops, setCrops] = useState<Crop[]>([])
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const fromLS = safeParseJSON<Order[]>(localStorage.getItem(LS.orders))
-    return fromLS && Array.isArray(fromLS) ? fromLS : mockOrders
-  })
+  const [orders, setOrders] = useState<Order[]>([])
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const fromLS = safeParseJSON<CartItem[]>(localStorage.getItem(LS.cart))
@@ -60,9 +52,29 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
   })
 
   const [session, setSession] = useState<SessionState>(() => {
-    const fromLS = safeParseJSON<SessionState>(localStorage.getItem(LS.session))
-    return fromLS?.userId ? fromLS : mockSession
+    const userJson = localStorage.getItem(LS.user)
+    if (userJson) {
+        try {
+            const u = JSON.parse(userJson)
+            return { role: u.role, userId: u._id || u.id }
+        } catch (e) {
+            console.error('Error parsing session from LS', e);
+        }
+    }
+    return { role: 'buyer', userId: 'guest' }
   })
+
+  function login(u: any) {
+    if (u && u.role) {
+        setSession({ role: u.role, userId: u._id || u.id });
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem(LS.user);
+    localStorage.removeItem(LS.token);
+    setSession({ role: 'buyer', userId: 'guest' });
+  }
 
   const [flash, setFlash] = useState<FlashState>(null)
 
@@ -85,31 +97,66 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
         }
       })
       .catch((err) => console.error("Failed to load crops from API", err))
+
+    getOrders()
+      .then((res: any) => {
+        const data = res.data || res;
+        const mappedOrders: Order[] = [];
+        for (const order of data) {
+          if (!order.items) continue;
+          for (const item of order.items) {
+            const crop = item.cropId;
+            if (!crop) continue;
+            const farmerName = users.find((u) => u.id === crop.farmerId)?.name || 'Demo Farmer';
+            mappedOrders.push({
+              id: order._id + '_' + crop._id,
+              buyerId: order.buyerId,
+              farmerId: crop.farmerId,
+              cropId: crop._id,
+              cropName: crop.name,
+              farmerName: farmerName,
+              quantity: item.quantity,
+              unitPrice: crop.price,
+              totalPrice: crop.price * item.quantity,
+              status: order.orderStatus === 'placed' ? 'Placed' : (order.orderStatus === 'confirmed' ? 'Processing' : (order.orderStatus === 'cancelled' ? 'Cancelled' : 'Delivered')),
+              createdAt: order.createdAt
+            });
+          }
+        }
+        setOrders(mappedOrders);
+      })
+      .catch((err) => console.error("Failed to load orders from API", err))
   }, [])
 
   // persist
-  useEffect(() => {
-    localStorage.setItem(LS.crops, JSON.stringify(crops))
-  }, [crops])
-
-  useEffect(() => {
-    localStorage.setItem(LS.orders, JSON.stringify(orders))
-  }, [orders])
-
   useEffect(() => {
     localStorage.setItem(LS.cart, JSON.stringify(cart))
   }, [cart])
 
   useEffect(() => {
-    localStorage.setItem(LS.session, JSON.stringify(session))
+    // Session is now controlled by Login/Logout pages
   }, [session])
 
   const currentUser = useMemo(() => {
-    const u = users.find((x) => x.id === session.userId)
-    if (u) return u
-    const fallback = users.find((x) => x.role === session.role) ?? users[0]
-    return fallback
-  }, [session.role, session.userId, users])
+    const userJson = localStorage.getItem(LS.user);
+    if (userJson) {
+        try {
+            const u = JSON.parse(userJson);
+            return { 
+              id: u._id || u.id, 
+              name: u.name, 
+              role: u.role 
+            } as User;
+        } catch (e) {
+            console.error('Error parsing User for memo', e);
+        }
+    }
+    return {
+      id: session.userId,
+      name: session.role.charAt(0).toUpperCase() + session.role.slice(1),
+      role: session.role
+    } as User;
+  }, [session.role, session.userId])
 
   const cartCount = useMemo(() => cart.reduce((sum, i) => sum + i.quantity, 0), [cart])
   const cartSubtotal = useMemo(() => computeCartSubtotal(crops, cart), [crops, cart])
@@ -120,10 +167,14 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
 
   function pushFlash(message: string, type: FlashType) {
     setFlash({ message, type })
-    window.setTimeout(() => setFlash((cur) => (cur ? null : cur)), 3500)
+    window.setTimeout(() => setFlash(null), 3500)
   }
 
   function addToCart(cropId: string, quantity = 1) {
+    if (currentUser.id === 'guest') {
+        window.location.href = '/login';
+        return;
+    }
     if (quantity <= 0) return
     const crop = crops.find((c) => c.id === cropId)
     if (!crop) return
@@ -192,6 +243,41 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       setCart([]);
       
       const order = res.data || res;
+      
+      // Map the newly placed order to append to the orders state
+      if (order && order.items) {
+        const mappedOrders: Order[] = [];
+        for (const item of order.items) {
+          // Find crop details in current state
+          const cropInfo = crops.find(c => c.id === item.cropId);
+          if (cropInfo) {
+            const farmerName = users.find((u) => u.id === cropInfo.farmerId)?.name || 'Demo Farmer';
+            mappedOrders.push({
+              id: order._id + '_' + cropInfo.id,
+              buyerId: order.buyerId,
+              farmerId: cropInfo.farmerId,
+              cropId: cropInfo.id,
+              cropName: cropInfo.name,
+              farmerName: farmerName,
+              quantity: item.quantity,
+              unitPrice: cropInfo.pricePerKg,
+              totalPrice: cropInfo.pricePerKg * item.quantity,
+              status: 'Placed',
+              createdAt: order.createdAt || new Date().toISOString()
+            });
+          }
+        }
+        setOrders(prev => [...mappedOrders, ...prev]);
+        
+        // Update stock locally for UI immediate feedback
+        setCrops(prev => prev.map(c => {
+          const boughtItem = order.items.find((i: any) => i.cropId === c.id);
+          if (boughtItem) {
+            return { ...c, quantityAvailable: Math.max(0, c.quantityAvailable - boughtItem.quantity) };
+          }
+          return c;
+        }));
+      }
       pushFlash(`Order successfully placed! Payment Status: ${order.paymentStatus}`, 'success')
       return order;
     } catch(err: any) {
@@ -299,10 +385,12 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     }
   }
 
-  const value: MarketplaceContextValue = {
-    session,
-    currentUser,
-    setSession: (next) => setSession(next),
+    const value: MarketplaceContextValue = {
+      session,
+      currentUser,
+      login,
+      logout,
+      setSession: (next) => setSession(next),
     users,
     crops,
     orders,

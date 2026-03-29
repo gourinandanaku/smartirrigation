@@ -1,0 +1,132 @@
+[
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 5
+      }
+    ],
+    "totalAmount": 180,
+    "paymentMethod": "ONLINE",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 2
+      }
+    ],
+    "totalAmount": 154,
+    "paymentMethod": "ONLINE",
+    "paymentStatus": "completed",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 2
+      }
+    ],
+    "totalAmount": 196,
+    "paymentMethod": "ONLINE",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 5
+      }
+    ],
+    "totalAmount": 56,
+    "paymentMethod": "ONLINE",
+    "paymentStatus": "completed",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 2
+      }
+    ],
+    "totalAmount": 152,
+    "paymentMethod": "ONLINE",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 2
+      }
+    ],
+    "totalAmount": 158,
+    "paymentMethod": "COD",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 3
+      }
+    ],
+    "totalAmount": 170,
+    "paymentMethod": "COD",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 1
+      }
+    ],
+    "totalAmount": 130,
+    "paymentMethod": "ONLINE",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 4
+      }
+    ],
+    "totalAmount": 184,
+    "paymentMethod": "ONLINE",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  },
+  {
+    "buyerId": "65b9c1d2e3f4a5b6c7d8e9f1",
+    "items": [
+      {
+        "cropId": "65b9c1d2e3f4a5b6c7d8e9f0",
+        "quantity": 3
+      }
+    ],
+    "totalAmount": 94,
+    "paymentMethod": "COD",
+    "paymentStatus": "pending",
+    "orderStatus": "placed"
+  }
+]

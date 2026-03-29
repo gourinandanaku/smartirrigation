@@ -14,6 +14,8 @@ export type MarketplaceContextValue = {
   // session
   session: SessionState
   currentUser: User
+  login: (userData: any) => void
+  logout: () => void
   setSession: (next: SessionState) => void
 
   // data

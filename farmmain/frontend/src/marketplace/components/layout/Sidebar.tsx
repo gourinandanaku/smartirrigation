@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { useMarketplace } from '../../state/useMarketplace'
 
 type NavItemProps = {
   to: string
@@ -24,18 +25,33 @@ function NavItem({ to, children, badge, end }: NavItemProps) {
 }
 
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { currentUser } = useMarketplace();
+  const isAdmin = currentUser.role === 'admin';
+  const isFarmer = currentUser.role === 'farmer';
+
   return (
     <aside className="sidebar">
       <nav className="nav" aria-label="Marketplace navigation" onClick={() => onNavigate?.()}>
-        <NavItem to="/marketplace" end>
+        <NavItem to="/" end>
           Marketplace
         </NavItem>
-        <NavItem to="/marketplace/cart">Cart</NavItem>
-        <NavItem to="/marketplace/farmer">Farmer Dashboard</NavItem>
-        <NavItem to="/marketplace/orders">Orders</NavItem>
-        <NavItem to="/marketplace/admin">Admin Dashboard</NavItem>
+        <NavItem to="/cart">Cart</NavItem>
+
+        {/* Farmer & Admin only */}
+        {(isAdmin || isFarmer) && (
+          <>
+            <NavItem to="/dashboard">Farmer Dashboard</NavItem>
+            <NavItem to="/farmer">Sell Crops</NavItem>
+          </>
+        )}
+
+        <NavItem to="/orders">Orders</NavItem>
+
+        {/* Admin only */}
+        {isAdmin && (
+          <NavItem to="/admin">Admin Dashboard</NavItem>
+        )}
       </nav>
     </aside>
   )
 }
-

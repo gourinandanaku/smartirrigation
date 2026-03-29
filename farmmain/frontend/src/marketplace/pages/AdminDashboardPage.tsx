@@ -73,22 +73,7 @@ export default function AdminDashboardPage() {
 
         <div className="form" style={{ textAlign: 'left' }}>
           <h2>All Users</h2>
-          <table className="table" aria-label="Users table">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td style={{ fontWeight: 900, color: 'var(--heading)' }}>{u.name}</td>
-                  <td>{u.role}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <p className="muted">No user data available.</p>
 
           <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>
             Tip: switch role from the header to test each dashboard.

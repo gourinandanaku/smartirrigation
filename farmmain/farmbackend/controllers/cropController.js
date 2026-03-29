@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Crop = require('../models/Crop');
 
 // @desc    Add a new crop
@@ -8,23 +9,40 @@ const addCrop = async (req, res) => {
     const { 
       name, description, price, quantity, 
       dateOfPlanting, estimatedHarvestTime, 
-      imageUrl, farmerId 
+      imageUrl, farmerId, category, location 
     } = req.body;
+
+    // STEP 1: Strict Validation for Mandatory Fields
+    if (!name || !price || !quantity || !farmerId || !imageUrl || !location) {
+      return res.status(400).json({ success: false, message: 'Please provide all mandatory fields (name, price, quantity, farmerId, imageUrl, location)' });
+    }
+
+    // STEP 2: Farmer Identity Check
+    if (!mongoose.Types.ObjectId.isValid(farmerId)) {
+        return res.status(401).json({ 
+            success: false, 
+            message: 'To list a crop, you must be a registered Farmer. Guest listings are not allowed in production.' 
+        });
+    }
 
     const crop = new Crop({
       name,
-      description,
-      price,
-      quantity,
-      dateOfPlanting,
-      estimatedHarvestTime,
+      description: description || `Fresh ${name.toLowerCase()}`,
+      category: category || 'Vegetable',
+      price: Number(price),
+      quantity: Number(quantity),
+      dateOfPlanting: dateOfPlanting || new Date(),
+      estimatedHarvestTime: estimatedHarvestTime || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 1 month
+      location,
       imageUrl,
-      farmerId
+      farmerId: new mongoose.Types.ObjectId(farmerId)
     });
 
     const createdCrop = await crop.save();
+    console.log(`[Marketplace] Real crop listed: ${createdCrop.name} by User ${farmerId}`);
     res.status(201).json({ success: true, data: createdCrop });
   } catch (error) {
+    console.error(`[Marketplace Error] ${error.message}`);
     res.status(400).json({ success: false, message: 'Invalid crop data', error: error.message });
   }
 };
