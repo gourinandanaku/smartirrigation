@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const CropMaster = require('./models/CropMaster');
+const CropMaster = require('../models/CropMaster');
 
 const MONGO_URI = "mongodb://user:user@ac-ynkznag-shard-00-00.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-01.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-02.dypnqbb.mongodb.net:27017/smartag?ssl=true&authSource=admin&replicaSet=atlas-ptkiw5-shard-0&retryWrites=true&w=majority";
 

@@ -6,8 +6,8 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const fs = require('fs');
 const mongoose = require('mongoose');
-const Crop = require('./models/Crop');
-const Order = require('./models/Order');
+const Crop = require('../models/Crop');
+const Order = require('../models/Order');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

@@ -6,8 +6,8 @@ const require = createRequire(import.meta.url);
 const mongoose = require('mongoose');
 const fs = require('fs');
 
-const Crop = require('./models/Crop');
-const Order = require('./models/Order');
+const Crop = require('../models/Crop');
+const Order = require('../models/Order');
 
 // Secure direct connection bypassed from local DNS block
 const MONGO_URI = "mongodb://user:user@ac-ynkznag-shard-00-00.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-01.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-02.dypnqbb.mongodb.net:27017/smartag?ssl=true&authSource=admin&replicaSet=atlas-ptkiw5-shard-0&retryWrites=true&w=majority";

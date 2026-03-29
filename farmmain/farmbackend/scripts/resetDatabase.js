@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 // Import all models to ensure they build correctly and their indexes are applied
-const User = require('./models/User');
-const Crop = require('./models/Crop');
-const Cart = require('./models/Cart');
-const Order = require('./models/Order');
-const Plot = require('./models/Plot');
-const Sensor = require('./models/Sensor');
-const Pump = require('./models/Pump');
-const CropThreshold = require('./models/CropThreshold');
+const User = require('../models/User');
+const Crop = require('../models/Crop');
+const Cart = require('../models/Cart');
+const Order = require('../models/Order');
+const Plot = require('../models/Plot');
+const Sensor = require('../models/Sensor');
+const Pump = require('../models/Pump');
+const CropThreshold = require('../models/CropThreshold');
 
 const uri = "mongodb://user:user@ac-ynkznag-shard-00-00.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-01.dypnqbb.mongodb.net:27017,ac-ynkznag-shard-00-02.dypnqbb.mongodb.net:27017/smartag?ssl=true&authSource=admin&replicaSet=atlas-ptkiw5-shard-0&retryWrites=true&w=majority";
 

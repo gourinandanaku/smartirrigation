@@ -26,7 +26,6 @@ const sensorSchema = new mongoose.Schema({
   }
 });
 
-// Create explicitly defined Index
-sensorSchema.index({ createdAt: 1 }, { expireAfterSeconds: 604800 });
+// TTL Index is automatically handled by the 'expires' property in the field definition above.
 
 module.exports = mongoose.model('Sensor', sensorSchema);

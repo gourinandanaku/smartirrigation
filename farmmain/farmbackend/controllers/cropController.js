@@ -39,7 +39,6 @@ const addCrop = async (req, res) => {
     });
 
     const createdCrop = await crop.save();
-    console.log(`[Marketplace] Real crop listed: ${createdCrop.name} by User ${farmerId}`);
     res.status(201).json({ success: true, data: createdCrop });
   } catch (error) {
     console.error(`[Marketplace Error] ${error.message}`);
