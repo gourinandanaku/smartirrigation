@@ -28,10 +28,9 @@ type HistoryEntry = {
 export default function SensorDashboard() {
   const [searchParams] = useSearchParams()
 
-  // URL params passed from FarmPlots when clicking "Open dashboard →"
   const plotId   = searchParams.get('plot')     || ''
   const deviceId = searchParams.get('device')   || ''
-  const location = searchParams.get('location') || ''   // "lat, lon" string
+  const location = searchParams.get('location') || ''
   const plotName = searchParams.get('name')     || 'Plot'
 
   const [activeTab, setActiveTab] = useState<TabType>('sensors')
@@ -56,15 +55,51 @@ export default function SensorDashboard() {
   const [historyError, setHistoryError] = useState<string | null>(null)
 
   // ── Irrigation / pump state ───────────────────────────────────────────────
-  const [autoOn, setAutoOn] = useState(true)
-  const [thresholdLow, setThresholdLow] = useState(40)
+  const [thresholdLow, setThresholdLow]   = useState(40)
   const [thresholdHigh, setThresholdHigh] = useState(70)
-  const [pumpStatus, setPumpStatus] = useState<'ON' | 'OFF'>('OFF')
+  const [pumpStatus, setPumpStatus]       = useState<'ON' | 'OFF'>('OFF')
   const [savingThreshold, setSavingThreshold] = useState(false)
-  const [thresholdSaved, setThresholdSaved] = useState(false)
+  const [thresholdSaved, setThresholdSaved]   = useState(false)
 
   // ══════════════════════════════════════════════════════════════════════════
-  // SENSOR POLLING  — every 5 s, uses deviceId from URL
+  // THRESHOLDS + PUMP STATUS — load on mount so values are ready immediately.
+  //
+  // FIX: Previously this only ran when the Irrigation tab was opened, so the
+  // crop-specific thresholds from MongoDB were never available to the rest of
+  // the component on first render. Now they load as soon as deviceId is known.
+  // ══════════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (!deviceId) return
+
+    const loadThresholds = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/threshold/${deviceId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setThresholdLow(data.start)
+        setThresholdHigh(data.stop)
+      } catch {
+        // keep defaults on error
+      }
+    }
+
+    const loadPumpStatus = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/pump/${deviceId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setPumpStatus(data.status === 'ON' ? 'ON' : 'OFF')
+      } catch {
+        // ignore
+      }
+    }
+
+    loadThresholds()
+    loadPumpStatus()
+  }, [deviceId])
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SENSOR POLLING — every 5 s
   // ══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!deviceId) return
@@ -83,6 +118,7 @@ export default function SensorDashboard() {
           humidity:     Number(latest.humidity     ?? 0),
           updated:      latest.createdAt ?? new Date().toISOString()
         })
+        setPumpStatus(latest.pumpRunning ? 'ON' : 'OFF')
       } catch (err) {
         setSensorError(err instanceof Error ? err.message : 'Unknown error')
       }
@@ -94,7 +130,7 @@ export default function SensorDashboard() {
   }, [deviceId])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // WEATHER  — uses lat/lon parsed from the "location" URL param
+  // WEATHER — uses lat/lon parsed from the "location" URL param
   // ══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!location) return
@@ -132,11 +168,11 @@ export default function SensorDashboard() {
   }, [location])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // HISTORY  — fetched once when history tab first opens
+  // HISTORY — fetched once when history tab first opens
   // ══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (activeTab !== 'history' || !deviceId) return
-    if (history.length > 0) return   // already loaded
+    if (history.length > 0) return
 
     const fetchHistory = async () => {
       try {
@@ -146,7 +182,6 @@ export default function SensorDashboard() {
         if (!res.ok) throw new Error('Failed to fetch history')
         const data = await res.json()
 
-        // Transform raw sensor docs → chart-friendly array (newest first → reverse for chart)
         const mapped: HistoryEntry[] = data
           .slice()
           .reverse()
@@ -169,67 +204,35 @@ export default function SensorDashboard() {
   }, [activeTab, deviceId])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // THRESHOLDS  — load from server when irrigation tab opens
+  // AUTO IRRIGATION — REMOVED FROM REACT.
+  //
+  // FIX: The ESP32 already runs its own auto-irrigation loop inside
+  // sendSensorData() every 5 s, using the crop-specific thresholds it fetches
+  // from MongoDB every 30 s. Having React also send pump commands on every
+  // moisture poll created a race condition: the dashboard would toggle the pump
+  // back OFF moments after the ESP turned it ON (or vice versa), because both
+  // sides used independent state and different timing.
+  //
+  // The correct division of responsibility is:
+  //   • ESP32  → sole authority for AUTO irrigation (runs on-device, reliable)
+  //   • React  → MANUAL override (Turn ON / Turn OFF buttons) + threshold edits
+  //
+  // If you want a dashboard "auto mode" indicator, read pumpStatus from the
+  // GET /api/pump/:deviceId poll — the ESP will have already updated it.
   // ══════════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (activeTab !== 'irrigation' || !deviceId) return
-
-    const loadThresholds = async () => {
-      try {
-        const res = await fetch(`http://localhost:5000/api/threshold/${deviceId}`)
-        if (!res.ok) return
-        const data = await res.json()
-        setThresholdLow(data.start)
-        setThresholdHigh(data.stop)
-      } catch {
-        // use defaults
-      }
-    }
-
-    const loadPumpStatus = async () => {
-      try {
-        const res = await fetch(`http://localhost:5000/api/pump/${deviceId}`)
-        if (!res.ok) return
-        const data = await res.json()
-        setPumpStatus(data.status === 'ON' ? 'ON' : 'OFF')
-      } catch {
-        // ignore
-      }
-    }
-
-    loadThresholds()
-    loadPumpStatus()
-  }, [activeTab, deviceId])
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // AUTO IRRIGATION  — when moisture drops below low threshold, send pump ON
-  // Only fires when autoOn is true
-  // ══════════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (!autoOn || !deviceId) return
-
-    const moisture = sensors.soilMoisture
-    const targetStatus: 'ON' | 'OFF' = moisture < thresholdLow ? 'ON' : moisture >= thresholdHigh ? 'OFF' : pumpStatus
-
-    if (targetStatus !== pumpStatus) {
-      sendPumpCommand(targetStatus)
-    }
-  }, [sensors.soilMoisture, autoOn])
 
   // ══════════════════════════════════════════════════════════════════════════
   // HELPERS
   // ══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Send pump ON/OFF to backend → ESP polls /api/pump/:deviceId every 4 s
-   */
+  /** Manual override — POST /api/pump → ESP polls every 4 s and toggles relay */
   const sendPumpCommand = async (status: 'ON' | 'OFF') => {
     if (!deviceId) return
     try {
       await fetch('http://localhost:5000/api/pump', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId, status })
+        body:    JSON.stringify({ deviceId, status })
       })
       setPumpStatus(status)
     } catch {
@@ -238,16 +241,18 @@ export default function SensorDashboard() {
   }
 
   /**
-   * Save updated thresholds to MongoDB → ESP fetches /api/threshold/:deviceId every 30 s
+   * Save thresholds to MongoDB.
+   * ESP32 fetches GET /api/threshold/:deviceId every 30 s (getThreshold())
+   * and updates its local startWateringAt / stopWateringAt variables.
    */
   const saveThresholds = async () => {
     if (!deviceId) return
     try {
       setSavingThreshold(true)
       await fetch(`http://localhost:5000/api/threshold/${deviceId}`, {
-        method: 'PUT',
+        method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start: thresholdLow, stop: thresholdHigh })
+        body:    JSON.stringify({ start: thresholdLow, stop: thresholdHigh })
       })
       setThresholdSaved(true)
       setTimeout(() => setThresholdSaved(false), 2000)
@@ -258,7 +263,7 @@ export default function SensorDashboard() {
     }
   }
 
-  // ── Derived status badges ─────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const moistureStatus = sensors.soilMoisture < 30 ? 'low' : sensors.soilMoisture > 70 ? 'high' : 'ok'
   const tempStatus     = sensors.temperature < 15 || sensors.temperature > 38 ? 'abnormal' : 'normal'
   const rainWarning    = forecast.some(f => f.rain > 50)
@@ -269,8 +274,6 @@ export default function SensorDashboard() {
     { key: 'history',    label: 'History' },
     { key: 'irrigation', label: 'Irrigation' },
   ]
-
-  // ─────────────────────────────────────────────────────────────────────────
 
   if (!deviceId) {
     return (
@@ -316,10 +319,7 @@ export default function SensorDashboard() {
         ))}
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB: SENSOR DATA
-          Polls GET /api/sensor/:deviceId every 5 s
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ── TAB: SENSOR DATA ── */}
       {activeTab === 'sensors' && (
         <div>
           {sensorError && (
@@ -364,10 +364,7 @@ export default function SensorDashboard() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB: WEATHER
-          Fetches GET /api/weather?lat=...&lon=... using coords from URL
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ── TAB: WEATHER ── */}
       {activeTab === 'weather' && (
         <div>
           <h2 style={{ marginTop: 0 }}>Weather Forecast — {location}</h2>
@@ -405,10 +402,7 @@ export default function SensorDashboard() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB: HISTORY
-          Fetches GET /api/sensor/history/:deviceId (last 50 readings from DB)
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ── TAB: HISTORY ── */}
       {activeTab === 'history' && (
         <div>
           <h2 style={{ marginTop: 0 }}>Historical Sensor Data — {plotName}</h2>
@@ -445,29 +439,40 @@ export default function SensorDashboard() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB: IRRIGATION
-          • Manual pump control → POST /api/pump {deviceId, status}
-            ESP polls GET /api/pump/:deviceId every 4 s and toggles relay
-          • Threshold save → PUT /api/threshold/:deviceId {start, stop}
-            ESP fetches GET /api/threshold/:deviceId every 30 s
-          • Auto mode uses live sensor moisture vs thresholds
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ── TAB: IRRIGATION ── */}
       {activeTab === 'irrigation' && (
         <div>
           <h2 style={{ marginTop: 0 }}>Irrigation Control — {plotName}</h2>
           <p style={{ color: 'var(--text-muted)' }}>
-            Manual and automatic irrigation. Thresholds are synced to your ESP32 device every 30 s.
+            Manual pump control and threshold editing. Auto-irrigation runs on the ESP32 device itself.
           </p>
+
+          {/* Info banner explaining the architecture */}
+          <div style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--primary-dim)',
+            borderRadius: 8,
+            padding: '0.75rem 1rem',
+            marginBottom: '1.5rem',
+            fontSize: '0.9rem',
+            color: 'var(--text-muted)',
+            maxWidth: 800,
+          }}>
+            ℹ️ Auto-irrigation is handled by the <code>{deviceId}</code> device using the thresholds below.
+            Use the buttons here for manual overrides only. The ESP32 will resume auto mode once
+            soil moisture reaches the stop threshold.
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', maxWidth: 800 }}>
 
-            {/* ── Status card ── */}
+            {/* ── Pump control card ── */}
             <div className="card">
               <h3 style={{ marginTop: 0 }}>Pump Status</h3>
               <p>
                 Current: <strong style={{ color: pumpStatus === 'ON' ? 'green' : 'orange' }}>{pumpStatus}</strong>
               </p>
+
+              {/* Manual buttons — sets manualOverride on ESP32 via pump API */}
               <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
                 <button
                   onClick={() => sendPumpCommand('ON')}
@@ -475,7 +480,8 @@ export default function SensorDashboard() {
                   style={{
                     padding: '0.5rem 1rem',
                     background: pumpStatus === 'ON' ? '#ccc' : 'green',
-                    color: 'white', border: 'none', borderRadius: 6, cursor: pumpStatus === 'ON' ? 'not-allowed' : 'pointer'
+                    color: 'white', border: 'none', borderRadius: 6,
+                    cursor: pumpStatus === 'ON' ? 'not-allowed' : 'pointer'
                   }}
                 >
                   💧 Turn ON
@@ -486,7 +492,8 @@ export default function SensorDashboard() {
                   style={{
                     padding: '0.5rem 1rem',
                     background: pumpStatus === 'OFF' ? '#ccc' : '#c0392b',
-                    color: 'white', border: 'none', borderRadius: 6, cursor: pumpStatus === 'OFF' ? 'not-allowed' : 'pointer'
+                    color: 'white', border: 'none', borderRadius: 6,
+                    cursor: pumpStatus === 'OFF' ? 'not-allowed' : 'pointer'
                   }}
                 >
                   🚫 Turn OFF
@@ -495,30 +502,17 @@ export default function SensorDashboard() {
 
               <hr style={{ opacity: 0.2 }} />
 
-              <h3>Auto Mode</h3>
-              <p>
-                Status: <strong>{autoOn ? '✅ Enabled' : '⏸ Disabled'}</strong>
-                <button
-                  onClick={() => setAutoOn(v => !v)}
-                  style={{
-                    marginLeft: '1rem',
-                    padding: '0.35rem 0.75rem',
-                    background: autoOn ? 'var(--primary)' : 'var(--surface-hover)',
-                    border: 'none', borderRadius: 6, color: 'white', cursor: 'pointer',
-                  }}
-                >
-                  {autoOn ? 'Disable' : 'Enable'}
-                </button>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 0 }}>
+                Current moisture: <strong style={{ color: 'var(--text)' }}>{sensors.soilMoisture}%</strong>
               </p>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Current moisture: <strong>{sensors.soilMoisture}%</strong>
-                {autoOn && sensors.soilMoisture < thresholdLow && (
-                  <span style={{ color: 'green', marginLeft: 8 }}>▶ Auto-irrigating</span>
-                )}
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                Thresholds: start at <strong style={{ color: 'var(--text)' }}>{thresholdLow}%</strong>,
+                stop at <strong style={{ color: 'var(--text)' }}>{thresholdHigh}%</strong>
               </p>
+
               {rainWarning && (
-                <p style={{ color: 'orange', fontSize: '0.9rem' }}>
-                  ⚠️ Rain forecast &gt;50% — consider disabling auto mode.
+                <p style={{ color: 'orange', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                  ⚠️ Rain forecast &gt;50% — consider leaving pump OFF.
                 </p>
               )}
             </div>
@@ -527,7 +521,7 @@ export default function SensorDashboard() {
             <div className="card">
               <h3 style={{ marginTop: 0 }}>Crop Thresholds</h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 0 }}>
-                Changes are saved to MongoDB and the ESP32 fetches them automatically every 30 s.
+                Saved to MongoDB. ESP32 fetches and applies them within 30 s.
               </p>
 
               <label style={{ display: 'block', marginBottom: '0.75rem' }}>
@@ -554,7 +548,8 @@ export default function SensorDashboard() {
                 style={{
                   padding: '0.5rem 1.25rem',
                   background: thresholdSaved ? 'green' : 'var(--primary)',
-                  color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600
+                  color: 'white', border: 'none', borderRadius: 6,
+                  cursor: 'pointer', fontWeight: 600
                 }}
               >
                 {savingThreshold ? 'Saving...' : thresholdSaved ? '✅ Saved!' : 'Save Thresholds'}

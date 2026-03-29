@@ -49,12 +49,14 @@ const sensorSchema = new mongoose.Schema({
   temperature: Number,
   humidity: Number,
   soilMoisture: Number,
+   pumpRunning:  Boolean,
   createdAt: {
     type: Date,
     default: Date.now
   }
 })
-
+// Keep only 7 days of data
+sensorSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 7 })
 const Sensor = mongoose.model("Sensor", sensorSchema)
 
 // ==============================
@@ -172,8 +174,8 @@ app.put("/api/threshold/:deviceId", async (req, res) => {
 
 app.post("/api/sensor", async (req, res) => {
   try {
-    const { deviceId, temperature, humidity, soilMoisture } = req.body
-    const data = new Sensor({ deviceId, temperature, humidity, soilMoisture })
+    const { deviceId, temperature, humidity, soilMoisture, pumpRunning } = req.body
+    const data = new Sensor({ deviceId, temperature, humidity, soilMoisture, pumpRunning })
     await data.save()
     res.json({ message: "Sensor data saved" })
   } catch (err) {
@@ -229,13 +231,17 @@ app.post("/api/pump", async (req, res) => {
   }
 })
 
+
 // ESP polls pump status
 app.get("/api/pump/:deviceId", async (req, res) => {
   try {
     const pump = await Pump.findOne({ deviceId: req.params.deviceId })
-    res.json({ status: pump ? pump.status : "OFF" })
+    res.json({
+      status:    pump ? pump.status    : "OFF",
+      updatedAt: pump ? pump.updatedAt : null   // ← ഇത് add ചെയ്യുക
+    })
   } catch (err) {
-    res.json({ status: "OFF" })
+    res.json({ status: "OFF", updatedAt: null })  // ← error case-ലും add
   }
 })
 
